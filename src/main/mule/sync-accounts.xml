@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	
+	<flow name="sfdcToMysqlAccountsSyncFlow" doc:id="54d070bd-21c0-4996-a1ea-31bbd9bf3b79" >
+		<batch:job jobName="sfdcToMysqlAccountsSyncFlow" doc:id="02bee417-9570-4d42-9e6a-3cf7f6ea8699" >
+			<batch:process-records >
+				<batch:step name="verifyAccountsInDatabase" doc:id="a112b136-84ea-4d92-bbd9-b22ab8935f4a" >
+					<http:request method="GET" doc:name="verify Accounts In Database" doc:id="d8007412-7f77-4505-ab7a-fde98dbcc66c" config-ref="MySQL_HTTP_Request_configuration" path="/accounts/name" target="mysqlExistingAccountVar">
+						<http:query-params ><![CDATA[#[{ accountName : payload.Name}]]]></http:query-params>
+					</http:request>
+					<ee:transform doc:name="Transform Message" doc:id="a312ed33-b26f-415d-b165-d92ea7e25bf0" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn="everywhere"
+---
+payload ++ {Id : vars.mysqlExistingAccountVar.Id}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="d710e70e-cc99-4a8b-9ffc-8857c54b7ddb" message='#[{&#10;	Name: payload.Name,&#10;	ExistingAccount: vars.mysqlExistingAccountVar&#10;}]'/>
+				</batch:step>
+				<batch:step name="insertAccountsIntoMysql" doc:id="f0296405-a28f-4c23-af8e-e73f8d956203" acceptExpression="#[ vars.mysqlExistingAccountVar.Id == null]">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="969b4787-9d9b-4506-9a1e-3ec0d3b66023" size="10" preserveMimeTypes="true">
+						<ee:transform doc:name="Map accounts for Insert" doc:id="ca7278a8-f978-43a8-8478-9738d3ea1b43" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn="everywhere"
+---
+payload map ($ - 'LastModifiedDate') ]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<http:request method="POST" doc:name="Request" doc:id="b25bc1a9-d483-4e54-af2b-56bb3b896932" config-ref="MySQL_HTTP_Request_configuration" path="/accounts" target="dbBulkInsertOutputVar"/>
+						<logger level="INFO" doc:name="Logger" doc:id="5b279758-15bf-4341-a536-6120d1e5f111" message='#["DB bulk insert output " ++ write(vars.dbBulkInsertOutputVar, "application/dw" )]'/>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="updateAccountsIntoMysql" doc:id="03bdd4cd-178d-448b-bd29-35fb09a979db" acceptExpression="#[ vars.mysqlExistingAccountVar.Id != null]">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="0b1b8fb2-2686-44d1-a6b4-fb18b46a1cf6" size="10" preserveMimeTypes="true">
+						<ee:transform doc:name="Map AccountsFor Update" doc:id="ac631b3f-0192-42f4-aa8b-0cc2cd382ca1" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn="everywhere"
+---
+payload map ($ - 'LastModifiedDate') ]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<http:request method="PUT" doc:name="Request" doc:id="46846bbd-d7a0-451a-bacc-b8f5e9132c10" config-ref="MySQL_HTTP_Request_configuration" path="/accounts" target="dbBulkUpdateOutputVar"/>
+						<logger level="INFO" doc:name="Logger" doc:id="15e4beaf-37f2-42b1-9fbf-76a6b3f9d87d" message='#["DB bulk Update output " ++ write(vars.dbBulkUpdateOutputVar, "application/dw" )]'/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<os:store doc:name="Set sync state to from Database" doc:id="fdda4888-3be6-49e2-93e7-1370b54eda01" key="syncState" objectStore="scheduler_Status">
+					<os:value ><![CDATA[fromDatabase]]></os:value>
+				</os:store>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+	<flow name="mysqlToSFDCAccountsSyncFlow" doc:id="1b495863-cc53-4d58-b8bb-3fd6dab29db8" >
+		<batch:job jobName="sf-mysql-accounts-process-apiBatch_Job" doc:id="e1f20bb8-8f52-49b2-9426-3429470cee16" >
+			<batch:process-records >
+				<batch:step name="verifyAccountsInSFDC" doc:id="a42004bf-a2a7-4459-88f6-515fc83d0f3f" >
+					<http:request method="GET" doc:name="verify Accounts In SFDC" doc:id="9f6b5270-1303-43cf-8665-d13df3cf393a" config-ref="SF_HTTP_Request_configuration" path="/accounts/name" target="sfdcExistingAccountVar">
+						<http:query-params ><![CDATA[#[{ accountName : payload.Name }]]]></http:query-params>
+					</http:request>
+					<ee:transform doc:name="Transform Message" doc:id="ee13ef42-0901-40d2-854f-f1e92dad0d90" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn="everywhere"
+---
+payload ++ {Id : vars.sfdcExistingAccountVar.Id}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="64b2b9ba-55c5-42c6-9edb-b830f3ceead2" message='#[{&#10;	Name: payload.Name,&#10;	ExistingAccount: vars.sfdcExistingAccountVar&#10;}]' />
+				</batch:step>
+				<batch:step name="upsertAccountsIntoSFDC" doc:id="c1d8146d-87f5-45aa-8562-ababc26166e2" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="b3c98f28-3e4e-49f7-bdbb-2c72dd43d5e8" size="10" preserveMimeTypes="true">
+						<ee:transform doc:name="Transform Message" doc:id="db31533d-94b1-45d7-9274-d0e6ac1933ec" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json skipNullOn="everywhere"
+---
+payload ]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<http:request method="PUT" doc:name="Request" doc:id="85ae15de-aac7-4bd0-b571-3d1de584cf41" config-ref="SF_HTTP_Request_configuration" path="/accounts" target="sfdcUpsertOutputVar"/>
+						<logger level="INFO" doc:name="Logger" doc:id="f750c5f9-714b-4406-9973-56df429a77ad" message='#["SFDC upsert output " ++ write(vars.sfdcUpsertOutputVar, "application/dw" )]'/>
+					</batch:aggregator>
+				</batch:step>
+			
+</batch:process-records>
+			<batch:on-complete >
+				<os:store doc:name="Set sync state to from Database" doc:id="4daf2d6a-2f03-4335-9b18-a5bc0675eb71" key="syncState" objectStore="scheduler_Status" >
+					<os:value ><![CDATA[fromSalesforce]]></os:value>
+				</os:store>
+			</batch:on-complete>
+		
+</batch:job>
+	</flow>
+	
+	</mule>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	
+	<!-- <flow name="getModifiedAccountsFromSFDC" doc:id="bd0612a4-111a-49ad-9a01-182406c79539" >
+		<os:retrieve doc:name="Retrieve Last Query Date SFDC" doc:id="5cfcc539-811c-44ca-8836-0dbe1549dea2" key="watermark" objectStore="Watermark_Store_SFDC" target="lastQueryDateSFDC">
+			<os:default-value ><![CDATA[#[%dw 2.0
+output application/java
+-&#45;&#45;
+(now() >> "PST") as DateTime { format : "yyyy-MM-dd'T'HH:mm:ss.SSSSSSS'Z'" } as String {format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" }
+//"2021-11-16T05:18:53.000+0000"]]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="Logger" doc:id="2ba37bef-0633-4099-a3f7-4daa7bf32cf1" message="#[{ LastModifiedDate : vars.lastQueryDateSFDC , LastModifiedById : ${sfdc.integration.user.id}}]"/>
+		<http:request method="GET" doc:name="Retrive Modified SFDC Accounts" doc:id="44eca85d-e3e6-4bbd-8f49-e66c0e85d209" config-ref="SF_HTTP_Request_configuration" path="/accounts">
+			<http:query-params ><![CDATA[#[{ LastModifiedDate : vars.lastQueryDateSFDC , LastModifiedById : ${sfdc.integration.user.id}}]]]></http:query-params>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="2a9c437b-9974-47c5-9792-8a8a5857dc18" message="#['Input SFDC data: ' ++ write(payload, 'application/dw')]"/>
+	</flow>
+	<flow name="getModifiedAccountsFromDBFlow" doc:id="3a885fed-89b8-4056-9631-e466dc5ecd40" >
+		<os:retrieve doc:name="Retrieve lastQueryDateDB" doc:id="b41d2be3-06f3-4104-a99d-a70448757a03" key="watermark" objectStore="Watermark_Store_DB" target="lastQueryDateDB">
+			<os:default-value ><![CDATA[#[%dw 2.0
+output application/java
+-&#45;&#45;
+now() as String {format: "yyyy-MM-dd'T'HH:mm:ss"}]]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="Logger" doc:id="6df4052b-80ba-488b-b247-4e938ebbcaf7" message="#[{ LastModifiedDate : vars.lastQueryDateDB ,LastModifiedById : ${db.integration.user.id}}]"/>
+		<http:request method="GET" doc:name="Retrive Modified DB Accounts" doc:id="5efe4850-681c-4aa7-8f40-03995e0b5076" config-ref="MySQL_HTTP_Request_configuration" path="/accounts">
+			<http:query-params ><![CDATA[#[{ LastModifiedDate : vars.lastQueryDateDB ,LastModifiedById : ${db.integration.user.id}}]]]></http:query-params>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="5efad015-731d-4f35-beb9-c9d8bf453dd7" message="#['Input DB data: ' ++ write(payload, 'application/dw')]"/>
+	</flow> -->
+	<flow name="getModifiedAccountsFromSFDC" doc:id="93f7220d-2bf9-4ccf-8a1b-91d465e367cf" >
+		<http:request method="GET" doc:name="Request" doc:id="4c20b50d-3c35-4344-bf0b-bc05a21b4f41" config-ref="MySQL_HTTP_Request_configuration" path="/accounts/lastModifiedDate" target="lastQueryDateDB" targetValue="#[(payload.LastModifiedDate - |PT5H30M| ) as DateTime { format : &quot;yyyy-MM-dd'T'HH:mm:ss.SSS'Z'&quot; } as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss.SSS'Z'&quot; }]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="192291e5-3f17-480f-a745-a9c290d7aa0b" message="#[{ LastModifiedDate : vars.lastQueryDateDB , &#10;	LastModifiedById : ${sfdc.integration.user.id}&#10;}]"/>
+		<http:request method="GET" doc:name="Retrive Modified SFDC Accounts" doc:id="1d7c9de6-95a6-44a4-9bb6-e3917ce34034" config-ref="SF_HTTP_Request_configuration" path="/accounts">
+			<http:query-params ><![CDATA[#[{ LastModifiedDate : vars.lastQueryDateDB , 
+	LastModifiedById : ${sfdc.integration.user.id}
+}]]]></http:query-params>
+		</http:request>
+		<!-- <logger level="INFO" doc:name="Logger" doc:id="2f8a5fd3-db20-4381-a27e-99f79d887938" message="#['Input SFDC data: ' ++ write(payload, 'application/dw')]"/> -->
+	</flow>
+	<flow name="getModifiedAccountsFromDBFlow" doc:id="cd44b4d4-c8e4-4c87-b04c-f2cb6cf9209c" >
+		<http:request method="GET" doc:name="Request" doc:id="2756339d-f7b6-47d6-8599-fca4b4d3736f" config-ref="SF_HTTP_Request_configuration" path="/accounts/lastModifiedDate" target="lastQueryDateSFDC" targetValue="#[(payload.LastModifiedDate &gt;&gt; &quot;IST&quot;) as DateTime { format : &quot;yyyy-MM-dd'T'HH:mm:ss&quot; } as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8f424553-dda4-44a4-8d0d-dda49b3b979a" message="#[{ LastModifiedDate : vars.lastQueryDateSFDC ,LastModifiedById : ${db.integration.user.id}}]"/>
+		<http:request method="GET" doc:name="Retrive Modified DB Accounts" doc:id="7bce6126-6f6d-4035-bcc2-2b29df8dd3dc" config-ref="MySQL_HTTP_Request_configuration" path="/accounts">
+			<http:query-params ><![CDATA[#[{ LastModifiedDate : vars.lastQueryDateSFDC ,
+	
+	LastModifiedById : ${db.integration.user.id}
+}]]]></http:query-params>
+		</http:request>
+		<!-- <logger level="INFO" doc:name="Logger" doc:id="e7385e14-37d4-408e-be18-f35ecb742789" message="#['Input DB data: ' ++ write(payload, 'application/dw')]"/> -->
+	</flow>
+	</mule>

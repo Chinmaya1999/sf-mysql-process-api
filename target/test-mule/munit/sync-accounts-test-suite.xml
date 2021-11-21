@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<munit:config name="sync-accounts-test-suite.xml" />
+	<munit:test name="sf-mysql-accounts-process-test-suite-getModifiedAccountsFromSFDC" doc:id="25dc9337-a5ac-4856-9646-6588c2fddd28" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock when" doc:id="7329328a-04d7-4ad3-88d0-24e21f532d7f" processor="http:request">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="520226e9-a74f-441e-a66e-36f1f917ad0b" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[MunitTools::getResourceAsString("sample_data/sf-modified-accounts-response.json")]' mediaType="application/dw" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="getModifiedAccountsFromSFDC" doc:id="55bdb156-b51f-4ea3-8e1a-2f87c81670c3" name="getModifiedAccountsFromSFDC"/>
+		</munit:execution>
+		<munit:validation >
+			<munit-tools:assert doc:name="Assert expression" doc:id="5a612d18-788e-4e0e-9c6f-2c4ec175b72e" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-mysql-accounts-process-test-suite-getModifiedAccountsFromDBFlow" doc:id="9dafc949-af3c-4d81-be68-0d1d4b797c93" description="Test">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock when" doc:id="2e67bfdd-70a9-4131-8c76-f05038b24143" processor="http:request">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="b71ecbec-b851-4d45-8334-7cf4665d83cd" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[MunitTools::getResourceAsString("sample_data/db-modified-accounts-response.json")]' mediaType="application/dw" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<flow-ref doc:name="getModifiedAccountsFromDBFlow" doc:id="1493ebad-6fb5-49c3-a413-58f56eb8f7ee" name="getModifiedAccountsFromDBFlow"/>
+		</munit:execution>
+		<munit:validation >
+			<munit-tools:assert doc:name="Assert expression" doc:id="601cb268-8619-4e59-8841-28de0862cc6c" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-mysql-accounts-process-test-suiteTest-schedulerFlow-triggerSFDCtoDBwithModifiedAccounts" doc:id="47f03c25-b99b-48e5-b0c5-dd54e0f9ebc2">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock when" doc:id="7d09174f-371d-4f10-901d-6e978f037334" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="0200089d-c2e8-4a12-a84b-5b3bb159560a" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[MunitTools::getResourceAsString("sample_data/sf-modified-accounts-response.json")]' mediaType="application/dw" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Mock when" doc:id="863288f3-a26c-4e71-a876-ace21767ddc3" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="874dff19-4ebe-4886-b4ce-03a0374b8db6" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[{"message" : "Batch Sync Completed Successfully"}]' mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<os:store doc:name="Set sync state to running" doc:id="b543ca93-93c3-4032-b9a6-c3c4fbfa3f80" key="syncState" objectStore="scheduler_Status">
+				<os:value><![CDATA[fromSalesforce]]></os:value>
+			</os:store>
+			<flow-ref doc:name="schedulerFlow" doc:id="81fa8bf2-9bef-465c-b2fe-75af87f4f07c" name="schedulerFlow"/>
+		</munit:execution>
+		<munit:validation >
+			<munit-tools:assert doc:name="Assert expression" doc:id="0100241a-6849-4401-b123-147e556d2483" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-mysql-accounts-process-test-suiteTest-schedulerFlow-triggerSFDCtoDBwithNoModifiedAccounts" doc:id="33435f54-0290-44fd-bc95-83e0fe8853f5">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock when" doc:id="3040f768-4f91-4928-ab97-d0c0060d34b6" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="0200089d-c2e8-4a12-a84b-5b3bb159560a" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[ [] ]" mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<os:store doc:name="Set sync state to running" doc:id="d5da08a5-f284-478e-aed0-8ef5b49e8b40" key="syncState" objectStore="scheduler_Status">
+				<os:value><![CDATA[fromSalesforce]]></os:value>
+			</os:store>
+			<flow-ref doc:name="schedulerFlow" doc:id="b7b7cab2-eb44-4803-a529-f9b5c9042abe" name="schedulerFlow"/>
+		</munit:execution>
+		<munit:validation>
+			<munit-tools:assert-that doc:name="Assert That - Payload is Expected" doc:id="e3bed024-4ec2-403b-aee3-c5af3f82b471" message="The response payload is not correct!" expression="#[payload]" is="#[MunitTools::isEmpty()]" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-mysql-accounts-process-test-suiteTest-schedulerFlow-triggerDBtoSFDCwithModifiedAccounts" doc:id="6ca3899c-c45c-4f2b-ab29-7e2205459f58">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock when" doc:id="aff4738f-3e1c-4fd2-bafd-f9e4d166e6e1" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="e4f0c1f1-9ed0-4492-89eb-28414606201c" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[MunitTools::getResourceAsString("sample_data/db-modified-accounts-response.json")]' mediaType="application/dw" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Mock when" doc:id="d6b7e726-e4f0-4538-b903-b3185ced25c3" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="cebd7f70-8093-4d40-a337-cea9cc32fa53" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[{"message" : "Batch Sync Completed Successfully"}]' mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<os:store doc:name="Set sync state to running" doc:id="1956b986-fd5b-49a9-84f0-401485044524" key="syncState" objectStore="scheduler_Status">
+				<os:value><![CDATA[fromDatabase]]></os:value>
+			</os:store>
+			<flow-ref doc:name="schedulerFlow" doc:id="91294fa6-1fbc-4d81-a283-fceb9a547cc8" name="schedulerFlow"/>
+		</munit:execution>
+		<munit:validation >
+			<munit-tools:assert doc:name="Assert expression" doc:id="da65a9da-0f1f-47bc-9271-1040da277bd7" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-mysql-accounts-process-test-suiteTest-schedulerFlow-triggerDBtoSFDCwithNoModifiedAccounts" doc:id="df27526c-9d69-44a8-bfe8-36b7b1f9dd32">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock when" doc:id="b9431233-e2d1-4052-9f5d-8fcd80549fa2" processor="flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="e4f0c1f1-9ed0-4492-89eb-28414606201c" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[ [] ]" mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution >
+			<os:store doc:name="Set sync state to running" doc:id="e95b0e73-63d3-43e0-ab6a-8dd59bda4bae" key="syncState" objectStore="scheduler_Status">
+				<os:value><![CDATA[fromDatabase]]></os:value>
+			</os:store>
+			<flow-ref doc:name="schedulerFlow" doc:id="4185bd2e-e271-417a-9ca8-7d6c9987ddcf" name="schedulerFlow"/>
+		</munit:execution>
+		<munit:validation>
+			<munit-tools:assert-that doc:name="Assert That - Payload is Expected" doc:id="2659e1fc-62ac-4337-b23a-ea2dd3375fb3" message="The response payload is not correct!" expression="#[payload]" is="#[MunitTools::isEmpty()]" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-mysql-accounts-process-test-suiteTest-schedulerFlow-triggerNoFlowAsSyncStateisNotValid" doc:id="cfc51766-dcfb-4e6c-bfb9-c0168e3791e7">
+		<munit:execution >
+			<os:store doc:name="Set sync state to running" doc:id="9ba3f43c-3bf3-4b8b-8ea7-054189219595" key="syncState" objectStore="scheduler_Status">
+				<os:value><![CDATA[dummyValue]]></os:value>
+			</os:store>
+			<flow-ref doc:name="schedulerFlow" doc:id="ab604c14-aadd-466b-a51a-fc30d41862e7" name="schedulerFlow"/>
+		</munit:execution>
+		<munit:validation >
+			<munit-tools:assert-that doc:name="Assert That - Payload is Expected" doc:id="6e6787c6-33af-43d2-ac72-babd2025fe6c" message="The response payload is not correct!" expression="#[payload]" is="#[MunitTools::isEmptyOrNullString()]" />
+		</munit:validation>
+	</munit:test>
+
+</mule>

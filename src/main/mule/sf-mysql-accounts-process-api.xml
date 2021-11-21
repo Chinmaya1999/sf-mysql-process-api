@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<os:object-store name="scheduler_Status" doc:name="scheduler_Status" doc:id="839d7ba3-34ce-41cc-b72d-7c14e40742b0"/>
+	<os:object-store name="Watermark_Store_SFDC" doc:name="Object store" doc:id="d53352d3-ed81-4328-88aa-1b1fc540cad5" expirationInterval="30"/>
+	<http:request-config name="SF_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="baaec0a5-69a2-482d-95e5-385e3990ea6e" basePath="/api" responseTimeout="500000">
+		<http:request-connection host="localhost" port="8083" connectionIdleTimeout="300000"/>
+	</http:request-config>
+	<http:request-config name="MySQL_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="9a3e2aac-d588-4125-91a2-9f3ea4c389fb" basePath="/api" responseTimeout="500000">
+		<http:request-connection host="localhost" port="8084" connectionIdleTimeout="300000"/>
+	</http:request-config>
+	<os:object-store name="Watermark_Store_DB" doc:name="Object store" doc:id="6d139ffa-7df8-483a-8501-6b4dbd65df0f" expirationInterval="30"/>
+	<!-- <flow name="schedulerFlow" doc:id="85d5ad52-5ad7-4dcd-945b-6fae987b965f" >
+		<scheduler doc:name="Scheduler" doc:id="c8bd9870-f7a1-40ec-bebc-ab03a527f728" >
+			<scheduling-strategy >
+				<fixed-frequency timeUnit="MINUTES" frequency="${scheduler.frequency}" startDelay="${scheduler.startDelay}"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve sync state" doc:id="8f7a3c92-b835-4023-9809-4fc358429b16" key="syncState" objectStore="scheduler_Status" target="syncState">
+			<os:default-value ><![CDATA[fromSalesforce]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="388618c0-e731-4bb1-8693-713ebe28b81f" >
+			<when expression="#[(vars.syncState != 'running' and vars.syncState == 'fromSalesforce') or vars.syncState == null]">
+				<logger level="INFO" doc:name="Sync from SFDC to DB" doc:id="2c354dcc-5ede-4a94-ba95-f9441b2885db" message="Synchronisation from SFDC to DB has been triggered"/>
+				<os:store doc:name="Set sync state to running" doc:id="21c10a97-f68c-4c11-a9b8-330eb2f3f12c" key="syncState" objectStore="scheduler_Status">
+					<os:value ><![CDATA[running]]></os:value>
+				</os:store>
+				<flow-ref doc:name="getModifiedAccountsFromSFDC" doc:id="8c01cdf8-d7d1-401e-bfa4-225ee63f0db2" name="getModifiedAccountsFromSFDC"/>
+				<choice doc:name="Choice" doc:id="3b39d2c3-c02f-4dc5-9fa5-33788df6bb60" >
+					<when expression="#[sizeOf(payload) &gt; 0]">
+						<os:store doc:name="Store lastQueryDateSfdc" doc:id="cc1eb086-af48-41c0-a940-8bbea95f8cc9" key="watermark" objectStore="Watermark_Store_SFDC" failOnNullValue="false">
+							<os:value ><![CDATA[#[max(payload map $.LastModifiedDate)]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="sfdcToMysqlAccountsSyncFlow" doc:id="f57e34fd-719d-48e3-80e8-81cae81d9649" name="sfdcToMysqlAccountsSyncFlow"/>
+					</when>
+					<otherwise >
+						<os:store doc:name="Set sync state to from Database" doc:id="60b072dd-8610-4e8c-9259-93c37ed58aca" key="syncState" objectStore="scheduler_Status">
+							<os:value><![CDATA[fromDatabase]]></os:value>
+						</os:store>
+						<logger level="INFO" doc:name="Logger" doc:id="26682feb-b8fa-4ccc-86e5-46b1f3cded5b" message="No modified accounts retrived from SFDC flow"/>
+					</otherwise>
+				</choice>
+			</when>
+			<when expression="#[vars.syncState != 'running' and vars.syncState == 'fromDatabase']">
+				<logger level="INFO" doc:name="Sync from DB to SFDC" doc:id="037cd3b8-5d26-4e5f-97d6-1001f8dbf25b" message="Synchronisation from DB to SFDC has been triggered"/>
+				<os:store doc:name="Set sync state to running" doc:id="dc9e38fc-dc59-4630-b388-e9eb38a3a2f1" key="syncState" objectStore="scheduler_Status" >
+					<os:value ><![CDATA[running]]></os:value>
+				</os:store>
+				<flow-ref doc:name="getModifiedAccountsFromDBFlow" doc:id="d23b64c4-8b7d-4c33-b5d9-0f7ae5f38dd4" name="getModifiedAccountsFromDBFlow"/>
+				<choice doc:name="Choice" doc:id="78416b9a-fc72-48a3-9963-a7da6111ca9a" >
+					<when expression="sizeOf(payload) &gt; 0">
+						<os:store doc:name="Store lastQueryDateSfdc" doc:id="7d9359c2-c1d4-46c1-aa32-806619627f02" key="watermark" objectStore="Watermark_Store_DB" failOnNullValue="false">
+							<os:value ><![CDATA[#[max(payload map $.LastModifiedDate)]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="mysqlToSFDCAccountsSyncFlow" doc:id="16941a98-7625-434c-ae50-d97ee31f5e0f" name="mysqlToSFDCAccountsSyncFlow"/>
+					</when>
+					<otherwise >
+						<os:store doc:name="Set sync state to from Database" doc:id="751444b7-c8fc-4b5d-abc7-3aa9764a2000" key="syncState" objectStore="scheduler_Status">
+							<os:value><![CDATA[fromSalesforce]]></os:value>
+						</os:store>
+						<logger level="INFO" doc:name="Logger" doc:id="9beb76f5-ca13-4e31-a8f4-960579c20781" message="No modified accounts retrived from DB flow"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="386765a6-12e5-4857-9219-d0ea14911061" message='#["Scheduler flow was not triggered " ++ vars.syncState]'/>
+			</otherwise>
+		</choice>
+	</flow> -->
+	
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f552701b-77f7-4926-a4bd-61522c1dec9a" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<flow name="sync-apiFlow" doc:id="a9d6c28d-001d-47d2-8f6d-f93b8100d4ab" >
+		<http:listener doc:name="Listener" doc:id="41a7652c-0549-4eb4-a065-4f7828949f25" config-ref="HTTP_Listener_config" path="/sync"/>
+		<logger level="INFO" doc:name="Logger" doc:id="50c4e7ed-0724-4322-b293-86d3dec2038e" message="Sync started"/>
+		<flow-ref doc:name="Flow Reference" doc:id="b23ab315-edd7-435e-83f5-68f6e31317c4" name="schedulerFlow"/>
+		<ee:transform doc:name="Transform Message" doc:id="8509dbed-1bb0-4f36-9acc-255151053adf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Message: "Sync started"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="schedulerFlow" doc:id="b3385cab-b9f1-4f27-b913-405555fc0313" >
+		<os:retrieve doc:name="Retrieve sync state" doc:id="3e954a64-b548-445a-9c05-226324948cb5" key="syncState" objectStore="scheduler_Status" target="syncState">
+			<os:default-value ><![CDATA[fromSalesforce]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="9964f509-54a5-44da-a02a-e1a4711a13e4" >
+			<when expression="#[(vars.syncState != 'running' and vars.syncState == 'fromSalesforce') or vars.syncState == null]">
+				<logger level="INFO" doc:name="Sync from SFDC to DB" doc:id="82b42233-c8b1-4289-9358-88d00360159f" message="Synchronisation from SFDC to DB has been triggered"/>
+				<os:store doc:name="Set sync state to running" doc:id="22660c58-1acc-48a8-953c-35d53aab116d" key="syncState" objectStore="scheduler_Status">
+					<os:value ><![CDATA[running]]></os:value>
+				</os:store>
+				<flow-ref doc:name="getModifiedAccountsFromSFDC" doc:id="1f5ec27a-5586-496b-b594-702f3793fa11" name="getModifiedAccountsFromSFDC"/>
+				<choice doc:name="Choice" doc:id="f43bc52e-a44d-459a-b6b4-693d1688c6b6" >
+					<when expression="#[sizeOf(payload) &gt; 0]">
+						<os:store doc:name="Store lastQueryDateSfdc" doc:id="ab2833ee-7730-485c-8940-4d2f864b89eb" key="watermark" objectStore="Watermark_Store_SFDC" failOnNullValue="false">
+							<os:value ><![CDATA[#[max(payload map $.LastModifiedDate)]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="sfdcToMysqlAccountsSyncFlow" doc:id="a54a1cbc-b1c6-4b78-8c8d-5e1be5d14ab6" name="sfdcToMysqlAccountsSyncFlow"/>
+					</when>
+					<otherwise >
+						<os:store doc:name="Set sync state to from Database" doc:id="9ba14b17-3f94-4871-91de-a8a8775567a9" key="syncState" objectStore="scheduler_Status">
+							<os:value><![CDATA[fromDatabase]]></os:value>
+						</os:store>
+						<logger level="INFO" doc:name="Logger" doc:id="a70633f4-a334-4919-a893-47b0f56995b0" message="No modified accounts retrived from SFDC flow"/>
+					</otherwise>
+				</choice>
+			</when>
+			<when expression="#[vars.syncState != 'running' and vars.syncState == 'fromDatabase']">
+				<logger level="INFO" doc:name="Sync from DB to SFDC" doc:id="a27d819c-9ce6-4da3-a5b8-ebe57395052e" message="Synchronisation from DB to SFDC has been triggered"/>
+				<os:store doc:name="Set sync state to running" doc:id="cc23fb0b-d99e-41eb-a48b-8b88f167fd19" key="syncState" objectStore="scheduler_Status" >
+					<os:value ><![CDATA[running]]></os:value>
+				</os:store>
+				<flow-ref doc:name="getModifiedAccountsFromDBFlow" doc:id="b9f095ec-fc79-4264-85e9-883f6622abc3" name="getModifiedAccountsFromDBFlow"/>
+				<choice doc:name="Choice" doc:id="f498c8d8-ea00-4c57-9911-c33c39e05480" >
+					<when expression="sizeOf(payload) &gt; 0">
+						<os:store doc:name="Store lastQueryDateSfdc" doc:id="1f6fbe66-4c73-470e-9741-15a5fc172f84" key="watermark" objectStore="Watermark_Store_DB" failOnNullValue="false">
+							<os:value ><![CDATA[#[max(payload map $.LastModifiedDate)]]]></os:value>
+						</os:store>
+						<flow-ref doc:name="mysqlToSFDCAccountsSyncFlow" doc:id="82d6f729-f6ea-4c9e-88fe-c9bcfb231e38" name="mysqlToSFDCAccountsSyncFlow"/>
+					</when>
+					<otherwise >
+						<os:store doc:name="Set sync state to from Database" doc:id="053ecfe2-09d8-4e95-8efc-9ed4a3044011" key="syncState" objectStore="scheduler_Status">
+							<os:value><![CDATA[fromSalesforce]]></os:value>
+						</os:store>
+						<logger level="INFO" doc:name="Logger" doc:id="6180fac8-4af7-4991-92bc-c5fd875d576f" message="No modified accounts retrived from DB flow"/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="6c8927c5-b0b4-42e6-a16d-3e64c36f9974" message='#["Scheduler flow was not triggered " ++ vars.syncState]'/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

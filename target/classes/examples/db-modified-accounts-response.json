@@ -1,0 +1,26 @@
+[
+  {
+    "Name": "Infosys",
+    "AccountNumber": "12345",
+    "BillingCity": "Hyderabad",
+    "BillingCountry": "India",
+    "BillingPostalCode": "500020",
+    "Description": "ABCD",
+    "LastModifiedDate": "2021-11-17T11:45:11",
+    "NumberOfEmployees": 1000,
+    "Phone": "123456789",
+    "Type": "Lead"
+  },
+  {
+    "Name": "Capegemini1212",
+    "AccountNumber": "12345",
+    "BillingCity": "Hyderabad",
+    "BillingCountry": "India",
+    "BillingPostalCode": "500020",
+    "Description": "ABCD",
+    "LastModifiedDate": "2021-11-17T11:45:11",
+    "NumberOfEmployees": 1000,
+    "Phone": "123456789",
+    "Type": "Lead"
+  }
+]
